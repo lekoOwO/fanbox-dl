@@ -19,6 +19,8 @@ var _ http.RoundTripper = (*Transport)(nil)
 func NewTransportWithOptions(logger tls_client.Logger, options ...tls_client.HttpClientOption) (*Transport, error) {
 	// Ensure no redirect following for RoundTripper compatibility
 	options = append(options, tls_client.WithNotFollowRedirects())
+	// Force using HTTP/1.1 (disable HTTP/2) in the underlying tls-client.
+	options = append(options, tls_client.WithForceHttp1())
 
 	client, err := tls_client.NewHttpClient(logger, options...)
 	if err != nil {
