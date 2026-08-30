@@ -189,7 +189,7 @@ var app = &cli.App{
 			return retryablehttp.DefaultRetryPolicy(ctx, resp, nil)
 		}
 
-		tlsTransp, err := tlsclient.NewTransportWithOptions(tls_client.NewNoopLogger(), tls_client.WithClientProfile(profiles.Chrome_146_PSK))
+		tlsTransp, err := tlsclient.NewTransportWithOptions(tls_client.NewNoopLogger(), tls_client.WithClientProfile(profiles.Firefox_135))
 		if err != nil {
 			return fmt.Errorf("create tls transport: %w", err)
 		}
