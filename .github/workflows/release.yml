@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: 1.27.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build Linux x86_64
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version="${VERSION_TAG#v}"
+          commit="$(git rev-parse HEAD)"
+          date="$(git show -s --format=%cI HEAD)"
+
+          mkdir -p dist
+
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
+            go build \
+              -trimpath \
+              -ldflags="-s -w -X main.version=${version} -X main.commit=${commit} -X main.date=${date}" \
+              -o dist/fanbox-dl \
+              ./cmd/fanbox-dl
+
+          tar -C dist -czf dist/fanbox-dl_Linux_x86_64.tar.gz fanbox-dl
+          (
+            cd dist
+            sha256sum fanbox-dl_Linux_x86_64.tar.gz > "fanbox-dl_${version}_checksums.txt"
+          )
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version="${VERSION_TAG#v}"
+          archive="dist/fanbox-dl_Linux_x86_64.tar.gz"
+          checksum="dist/fanbox-dl_${version}_checksums.txt"
+
+          if gh release view "$VERSION_TAG" >/dev/null 2>&1; then
+            gh release upload "$VERSION_TAG" "$archive" "$checksum" --clobber
+          else
+            gh release create "$VERSION_TAG" \
+              "$archive" \
+              "$checksum" \
+              --verify-tag \
+              --title "$VERSION_TAG" \
+              --generate-notes
+          fi
